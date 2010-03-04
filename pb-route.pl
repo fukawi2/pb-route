@@ -33,15 +33,22 @@ my %config; # The hash where the config will be stored once read
 	$IP2 = defined($config{ip}) ? $config{ip} : '/sbin/ip';
 }
 
+###############################################################################
+### Initialize and Setup Standard Configuration
+###############################################################################
 &setup_route_tables;
-
 &ipt_flush;
-
 &initialize_mangle;
 
-# Setup Policies
+###############################################################################
+### Setup Policies
+###############################################################################
+my $cnt; # Count number of policies for feedback
+
 my @dests;
 @dests = ref($config{destination}) eq 'ARRAY' ? @{$config{destination}} : ($config{destination});
+$cnt = @dests;
+&comment("Setting up DESTINATION based routing policies ($cnt policies)");
 foreach (@dests) {
 	my($dest_address, $gw) = split(' ', $_);
 	next unless ($dest_address =~ /^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
@@ -53,6 +60,8 @@ foreach (@dests) {
 }
 my @ports;
 @ports = ref($config{port}) eq 'ARRAY' ? @{$config{port}} : ($config{port});
+$cnt = @ports;
+&comment("Setting up PORT based routing policies ($cnt policies)");
 foreach (@ports) {
 	my($dest_port, $gw) = split(' ', $_);
 	next unless ($dest_port =~ /^([0-9]+)$/);
@@ -68,6 +77,8 @@ foreach (@ports) {
 }
 my @protos;
 @protos = ref($config{proto}) eq 'ARRAY' ? @{$config{proto}} : ($config{proto});
+$cnt = @protos;
+&comment("Setting up PROTOCOL based routing policies ($cnt policies)");
 foreach (@protos) {
 	my($protocol, $gw) = split(' ', $_);
 	next unless ($protocol =~ /^(tcp|udp|icmp|gre)$/);
@@ -78,6 +89,7 @@ foreach (@protos) {
 	&ipt("-t mangle -A OUTPUT -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j ACCEPT");
 }
 	
+&comment("Setting up DEFAULT routing policy");
 switch ($config{default}) {
 	case "balanced" {
 		# Default balance between connections
@@ -101,10 +113,12 @@ switch ($config{default}) {
 	}
 }
 
-
+###############################################################################
+### Cleanup
+###############################################################################
 &setup_snat;
-
-# Flush the route cache to make it pickup new route tables
+# Flush the route cache to make it picks up our new routing policies
+&comment('Flushing route cache so new routes take effect');
 &ip2('route flush cache');
 
 ###############################################################################
@@ -113,12 +127,12 @@ switch ($config{default}) {
 
 sub bomb {
 	# Bomb out for some reason
-	my($err) = @_;
-	printf ("BOMBED OUT: %s\n", $err);
+	printf ("BOMBS AWAY: %s\n", @_);
 	exit 1;
 }
 
 sub setup_route_tables {
+	&comment('Setting up multiple routing tables');
 	my @routes = map { chomp; $_ } grep { !/^default/ } `/sbin/ip route list table main`;
 
 	# Routing Table for packets directed out Connection 1
@@ -142,6 +156,7 @@ sub setup_route_tables {
 
 sub ipt_flush {
 	# Flush all iptables rules
+	&comment('Flushing all tables');
 	&ipt('-F');
 	&ipt('-X');
 	&ipt('-t nat -F');
@@ -154,15 +169,19 @@ sub ipt_flush {
 }
 
 sub initialize_mangle {
+	&comment('Initializing "mangle" table');
+	&comment('==> Handle connection streams that have already been marked');
 	&ipt('-t mangle -A PREROUTING -j CONNMARK --restore-mark');
 	&ipt('-t mangle -A PREROUTING -m comment --comment "this stream is already marked; escape early" -m mark ! --mark 0 -j ACCEPT');
 	# This marks any NEW incoming connections with the connection
 	# they came in via so replies go back the same way.
+	&comment('==> Handle incoming connection streams to route back via where they came in');
 	&ipt("-t mangle -A PREROUTING -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j M101");
 	&ipt("-t mangle -A PREROUTING -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j M102");
 }
 
 sub setup_mark_chains {
+	&comment('Setting up marking chains');
 	&ipt('-t mangle -N M101');
 	&ipt('-t mangle -A M101 -j MARK –set-mark 101');
 	&ipt('-t mangle -A M101 -j CONNMARK –save-mark');
@@ -172,9 +191,11 @@ sub setup_mark_chains {
 }
 
 sub setup_snat {
+	&comment('Setting up Source NATs');
 	foreach (split(' ', $config{snat})) {
 		next unless (/^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
 		my $snat_source = $1;
+		&comment('==> Adding SNAT for '.$snat_source);
 		&ipt("-t nat -A POSTROUTING -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT –to-source $config{ip1}");
 		&ipt("-t nat -A POSTROUTING -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT –to-source $config{ip2}");
 	}
@@ -182,11 +203,15 @@ sub setup_snat {
 
 sub ip2 {
 	# Do an iproute2 command
-	$PRINT_ONLY = 1 ? printf("%s %s\n", $IP2, @_) : system(sprintf('%s %s', $IP2, @_));
+	$PRINT_ONLY == 1 ? printf("%s %s\n", $IP2, @_) : system(sprintf('%s %s', $IP2, @_));
 }
 sub ipt {
 	# Do an iptables command
-	$PRINT_ONLY = 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
+	$PRINT_ONLY == 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
+}
+sub comment {
+	# Make a comment in print mode
+	printf("# %s\n", @_) if $PRINT_ONLY == 1;
 }
 
 sub trim($) {
