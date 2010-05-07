@@ -234,7 +234,7 @@ sub setup_route_tables {
 	foreach (@routes) {
 	        &ip2('route add table 1 '.&trim($_).' 2>/dev/null');
 	}
-	&ip2("route add table 1 default via $config{gw1ip}");
+	&ip2("route add table 1 default via $config{gw1ip} dev $config{if1}");
 	&ip2('rule add fwmark 101 table 1');
 
 	# Routing Table for packets directed out Connection 2
@@ -243,7 +243,7 @@ sub setup_route_tables {
 	foreach (@routes) {
 	        &ip2('route add table 2 '.&trim($_).' 2>/dev/null');
 	}
-	&ip2("route add table 2 default via $config{gw2ip}");
+	&ip2("route add table 2 default via $config{gw2ip} dev $config{if2}");
 	&ip2('rule add fwmark 102 table 2');
 }
 
