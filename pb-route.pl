@@ -119,23 +119,23 @@ foreach (@protos) {
 switch ($config{default}) {
 	case "balanced" {
 		# Default balance between connections
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p tcp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p udp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
 	}
 	case /[0-9]/ {
 		# Default via a specific connection
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state –state NEW -j M10$config{default}");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state –state NEW -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j M10$config{default}");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j ACCEPT");
 	}
 }
 
