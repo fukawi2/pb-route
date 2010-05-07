@@ -131,7 +131,7 @@ switch ($config{default}) {
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j Mgw2");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j ACCEPT");
 	}
-	case /[0-9]/ {
+	case /gw[0-9]/ {
 		# Default via a specific connection
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
@@ -280,10 +280,10 @@ sub initialize_mangle {
 sub setup_mark_chains {
 	&comment('Setting up marking chains');
 	&ipt('-t mangle -N Mgw1');
-	&ipt("-t mangle -A Mgw1 -m comment --comment 'mark as $config{gw1} traffic' -j MARK --set-mark 101");
+	&ipt("-t mangle -A Mgw1 -m comment --comment 'send via $config{gw1ip}' -j MARK --set-mark 101");
 	&ipt('-t mangle -A Mgw1 -j CONNMARK --save-mark');
 	&ipt('-t mangle -N Mgw2');
-	&ipt("-t mangle -A Mgw2 -m comment --comment 'mark as $config{gw2} traffic' -j MARK --set-mark 102");
+	&ipt("-t mangle -A Mgw2 -m comment --comment 'send via $config{gw2ip}' -j MARK --set-mark 102");
 	&ipt('-t mangle -A Mgw2 -j CONNMARK --save-mark');
 }
 
