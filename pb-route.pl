@@ -29,6 +29,7 @@ my $verbose = 1;
 # Runtime variables
 my $IPT;	# Path to 'iptables' binary
 my $IP2;	# Path to iproute2 'ip' binary
+my $TC;		# Path to 'tc' binary
 my $PRINT_ONLY = 1;	# True = Print to Screen; False = Do rules
 
 # Read the config file (or die)
@@ -47,6 +48,7 @@ my %config; # The hash where the config will be stored once read
 
 	$IPT = defined($config{iptables}) ? $config{iptables} : '/sbin/iptables';
 	$IP2 = defined($config{ip}) ? $config{ip} : '/sbin/ip';
+	$TC  = defined($config{tc}) ? $config{tc} : '/sbin/tc';
 }
 
 ###############################################################################
@@ -110,7 +112,7 @@ foreach (@protos) {
 	&ipt("-t mangle -A OUTPUT -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j M10$gw");
 	&ipt("-t mangle -A OUTPUT -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j ACCEPT");
 }
-	
+
 &comment("Setting up DEFAULT routing policy");
 switch ($config{default}) {
 	case "balanced" {
@@ -133,6 +135,58 @@ switch ($config{default}) {
 		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m comment --comment 'default via connection $config{default}' -j M10$config{default}");
 		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m comment --comment 'default via connection $config{default}' -j ACCEPT");
 	}
+}
+
+###############################################################################
+### Setup Traffic Shaping
+###############################################################################
+my @ifaces;
+my @ifspeeds;
+@ifaces = ($config{if1}, $config{if2});
+@ifspeeds = ($config{if1speed}, $config{if2speed});
+$cnt = @ifaces;
+&comment("Setting up TRAFFIC SHAPING Policies");
+for(my $X = 0; $X < $cnt; $X++) {
+	my $iface   = $ifaces[$X];
+	my $ifspeed = $ifspeeds[$X];
+
+	&comment("---> Special Policies for interface $iface");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --syn -m length --length 40:68 -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL SYN,ACK -m length --length 40:68 -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK -m length --length 40:100 -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL RST -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK,RST -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK,FIN -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'icmp high priority' -o $iface -p icmp -m length --length 40:256 -j CLASSIFY --set-class 1:10");
+	# High Priority Ports
+	&comment("---> High Priority Ports for interface $iface");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp -m multiport --sports 22,53,80 -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp -m multiport --dports 22,53,80 -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p udp -m multiport --sports 22,53,80 -j CLASSIFY --set-class 1:10");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p udp -m multiport --dports 22,53,80 -j CLASSIFY --set-class 1:10");
+	# Low Priority Ports
+	&comment("---> Low Priority Ports for interface $iface");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p tcp -m multiport --sports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p tcp -m multiport --dports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p udp -m multiport --sports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p udp -m multiport --dports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+	# Extra Low Priority Ports
+	&comment("---> Extra Low Priority Ports for interface $iface");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p tcp -m multiport --sports 25,18925,49162 -j CLASSIFY --set-class 1:30");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p tcp -m multiport --dports 25,18925,49162 -j CLASSIFY --set-class 1:30");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p udp -m multiport --sports 25,18925,49162 -j CLASSIFY --set-class 1:30");
+	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p udp -m multiport --dports 25,18925,49162 -j CLASSIFY --set-class 1:30");
+	# Install TC shaping policies
+	&comment("---> tc rules for interface $iface ($ifspeed kbps)");
+	&tc(sprintf("qdisc del dev %s root;", $iface));
+	&tc(sprintf("qdisc add dev %s root handle 1: htb default 20;", $iface));
+	&tc(sprintf("class add dev %s parent 1: classid 1:1 htb rate %skbit", $iface, $ifspeed));
+	&tc(sprintf("class add dev %s parent 1:1 classid 1:10 htb rate %skbit ceil %skbit prio 0", $iface, $ifspeed-30, $ifspeed+10));
+	&tc(sprintf("class add dev %s parent 1:1 classid 1:20 htb rate %skbit ceil %skbit prio 1", $iface, ($ifspeed+10)/8, $ifspeed));
+	&tc(sprintf("class add dev %s parent 1:1 classid 1:30 htb rate %skbit ceil %skbit prio 2", $iface, $ifspeed/15, $ifspeed-($ifspeed/3)));
+	&tc(sprintf("qdisc add dev %s parent 1:10 handle 10: sfq perturb 10", $iface));
+	&tc(sprintf("qdisc add dev %s parent 1:20 handle 20: sfq perturb 10", $iface));
+	&tc(sprintf("qdisc add dev %s parent 1:30 handle 30: sfq perturb 10", $iface));
 }
 
 ###############################################################################
@@ -230,6 +284,10 @@ sub ip2 {
 sub ipt {
 	# Do an iptables command
 	$PRINT_ONLY == 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
+}
+sub tc {
+	# Do a 'tc' command
+	$PRINT_ONLY == 1 ? printf("%s %s\n", $TC, @_) : system(sprintf('%s %s', $TC, @_));
 }
 sub comment {
 	# Make a comment in print mode
