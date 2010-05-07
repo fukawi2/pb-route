@@ -77,10 +77,10 @@ foreach (@dests) {
 	my($dest_address, $gw) = split(' ', $_);
 	next unless ($dest_address =~ /^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
 	$dest_address = $1;
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -d $dest_address -m comment --comment '$dest_address via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -d $dest_address -m comment --comment '$dest_address via connection $gw' -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -d $dest_address -m comment --comment '$dest_address via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -d $dest_address -m comment --comment '$dest_address via connection $gw' -j ACCEPT");
+	&ipt("-t mangle -A PREROUTING -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j ACCEPT");
+	&ipt("-t mangle -A OUTPUT -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j ACCEPT");
 }
 my @ports;
 @ports = ref($config{port}) eq 'ARRAY' ? @{$config{port}} : ($config{port});
@@ -90,14 +90,14 @@ foreach (@ports) {
 	my($dest_port, $gw) = split(' ', $_);
 	next unless ($dest_port =~ /^([0-9]+)$/);
 	$dest_port = $1;
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -p tcp --dport $dest_port -m comment --comment 'tcp $dest_port via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -p tcp --dport $dest_port -m comment --comment 'tcp $dest_port via connection $gw' -j ACCEPT");
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -p udp --dport $dest_port -m comment --comment 'udp $dest_port via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -p udp --dport $dest_port -m comment --comment 'udp $dest_port via connection $gw' -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -p tcp --dport $dest_port -m comment --comment 'tcp $dest_port via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -p tcp --dport $dest_port -m comment --comment 'tcp $dest_port via connection $gw' -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -p udp --dport $dest_port -m comment --comment 'udp $dest_port via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -p udp --dport $dest_port -m comment --comment 'udp $dest_port via connection $gw' -j ACCEPT");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j ACCEPT");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j ACCEPT");
+	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j ACCEPT");
+	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j ACCEPT");
 }
 my @protos;
 @protos = ref($config{proto}) eq 'ARRAY' ? @{$config{proto}} : ($config{proto});
@@ -107,98 +107,100 @@ foreach (@protos) {
 	my($protocol, $gw) = split(' ', $_);
 	next unless ($protocol =~ /^(tcp|udp|icmp|gre)$/);
 	$protocol = $1;
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A PREROUTING -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j M10$gw");
-	&ipt("-t mangle -A OUTPUT -m state --state NEW -p $protocol -m comment --comment '$protocol via connection $gw' -j ACCEPT");
+	&ipt("-t mangle -A PREROUTING -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j ACCEPT");
+	&ipt("-t mangle -A OUTPUT -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j ACCEPT");
 }
 
 &comment("Setting up DEFAULT routing policy");
 switch ($config{default}) {
 	case "balanced" {
 		# Default balance between connections
-		&ipt("-t mangle -A PREROUTING -p tcp -m state –state ESTABLISHED,RELATED -m comment --comment 'default balancing' -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -p udp -m state –state ESTABLISHED,RELATED -m comment --comment 'default balancing' -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -m comment --comment 'default balancing' -j M101");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -m comment --comment 'default balancing' -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -m comment --comment 'default balancing' -j M102");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -m comment --comment 'default balancing' -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -m comment --comment 'default balancing' -j M101");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -m comment --comment 'default balancing' -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -m comment --comment 'default balancing' -j M102");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -m comment --comment 'default balancing' -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p tcp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p udp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state –state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
 	}
 	case /[0-9]/ {
 		# Default via a specific connection
-		&ipt("-t mangle -A PREROUTING -p tcp -m state –state ESTABLISHED,RELATED -m comment --comment 'default via connection $config{default}' -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -p udp -m state –state ESTABLISHED,RELATED -m comment --comment 'default via connection $config{default}' -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m comment --comment 'default via connection $config{default}' -j M10$config{default}");
-		&ipt("-t mangle -A PREROUTING -m mark --mark 0 -p tcp -m state –state NEW -m comment --comment 'default via connection $config{default}' -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state –state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state –state NEW -j M10$config{default}");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state –state NEW -j ACCEPT");
 	}
 }
 
 ###############################################################################
 ### Setup Traffic Shaping
 ###############################################################################
-my @ifaces;
-my @ifspeeds;
-@ifaces = ($config{if1}, $config{if2});
-@ifspeeds = ($config{if1speed}, $config{if2speed});
-$cnt = @ifaces;
-&comment("Setting up TRAFFIC SHAPING Policies");
-for(my $X = 0; $X < $cnt; $X++) {
-	my $iface   = $ifaces[$X];
-	my $ifspeed = $ifspeeds[$X];
-
-	my @ipt_protos = ('tcp', 'udp');
-	my @ipt_ports  = ('dports', 'sports');
-
-	&comment("---> Special Policies for interface $iface");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --syn -m length --length 40:68 -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL SYN,ACK -m length --length 40:68 -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK -m length --length 40:100 -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL RST -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK,RST -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK,FIN -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'icmp high priority' -o $iface -p icmp -m length --length 40:256 -j CLASSIFY --set-class 1:10");
-	# High Priority Ports
-	&comment("---> High Priority Ports for interface $iface");
-	foreach (@ipt_protos) {
-		my $proto = $_;
-		foreach (@ipt_ports) {
-			my $port_rule = $_;
-			&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p $proto -m multiport --$port_rule 22,53,80 -j CLASSIFY --set-class 1:10");
+if (defined($config{if1speed}) and defined($config{if2speed})) {
+	my @ifaces;
+	my @ifspeeds;
+	@ifaces = ($config{if1}, $config{if2});
+	@ifspeeds = ($config{if1speed}, $config{if2speed});
+	$cnt = @ifaces;
+	&comment("Setting up TRAFFIC SHAPING Policies");
+	for(my $X = 0; $X < $cnt; $X++) {
+		my $iface   = $ifaces[$X];
+		my $ifspeed = $ifspeeds[$X];
+	
+		my @ipt_protos = ('tcp', 'udp');
+		my @ipt_ports  = ('dports', 'sports');
+	
+		&comment("---> Special Policies for interface $iface");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --syn -m length --length 40:68 -j CLASSIFY --set-class 1:10");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL SYN,ACK -m length --length 40:68 -j CLASSIFY --set-class 1:10");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK -m length --length 40:100 -j CLASSIFY --set-class 1:10");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL RST -j CLASSIFY --set-class 1:10");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK,RST -j CLASSIFY --set-class 1:10");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL ACK,FIN -j CLASSIFY --set-class 1:10");
+		&ipt("-t mangle -A POSTROUTING -m comment --comment 'icmp high priority' -o $iface -p icmp -m length --length 40:256 -j CLASSIFY --set-class 1:10");
+		# High Priority Ports
+		&comment("---> High Priority Ports for interface $iface");
+		foreach (@ipt_protos) {
+			my $proto = $_;
+			foreach (@ipt_ports) {
+				my $port_rule = $_;
+				&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p $proto -m multiport --$port_rule 22,53,80 -j CLASSIFY --set-class 1:10");
+			}
 		}
-	}
-	# Low Priority Ports
-	&comment("---> Low Priority Ports for interface $iface");
-	foreach (@ipt_protos) {
-		my $proto = $_;
-		foreach (@ipt_ports) {
-			my $port_rule = $_;
-			&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p $proto -m multiport --$port_rule 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+		# Low Priority Ports
+		&comment("---> Low Priority Ports for interface $iface");
+		foreach (@ipt_protos) {
+			my $proto = $_;
+			foreach (@ipt_ports) {
+				my $port_rule = $_;
+				&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p $proto -m multiport --$port_rule 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+			}
 		}
-	}
-	# Extra Low Priority Ports
-	&comment("---> Extra Low Priority Ports for interface $iface");
-	foreach (@ipt_protos) {
-		my $proto = $_;
-		foreach (@ipt_ports) {
-			my $port_rule = $_;
-			&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p $proto -m multiport --$port_rule 25,18925,49162 -j CLASSIFY --set-class 1:30");
+		# Extra Low Priority Ports
+		&comment("---> Extra Low Priority Ports for interface $iface");
+		foreach (@ipt_protos) {
+			my $proto = $_;
+			foreach (@ipt_ports) {
+				my $port_rule = $_;
+				&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p $proto -m multiport --$port_rule 25,18925,49162 -j CLASSIFY --set-class 1:30");
+			}
 		}
+		# Install TC shaping policies
+		&comment("---> tc rules for interface $iface ($ifspeed kbps)");
+		&tc(sprintf("qdisc del dev %s root;", $iface));
+		&tc(sprintf("qdisc add dev %s root handle 1: htb default 20;", $iface));
+		&tc(sprintf("class add dev %s parent 1: classid 1:1 htb rate %skbit", $iface, $ifspeed));
+		&tc(sprintf("class add dev %s parent 1:1 classid 1:10 htb rate %skbit ceil %skbit prio 0", $iface, int($ifspeed/1.3), $ifspeed+10));
+		&tc(sprintf("class add dev %s parent 1:1 classid 1:20 htb rate %skbit ceil %skbit prio 1", $iface, int(($ifspeed+10)/8), $ifspeed));
+		&tc(sprintf("class add dev %s parent 1:1 classid 1:30 htb rate %skbit ceil %skbit prio 2", $iface, int($ifspeed/15), int($ifspeed-($ifspeed/3))));
+		&tc(sprintf("qdisc add dev %s parent 1:10 handle 10: sfq perturb 10", $iface));
+		&tc(sprintf("qdisc add dev %s parent 1:20 handle 20: sfq perturb 10", $iface));
+		&tc(sprintf("qdisc add dev %s parent 1:30 handle 30: sfq perturb 10", $iface));
 	}
-	# Install TC shaping policies
-	&comment("---> tc rules for interface $iface ($ifspeed kbps)");
-	&tc(sprintf("qdisc del dev %s root;", $iface));
-	&tc(sprintf("qdisc add dev %s root handle 1: htb default 20;", $iface));
-	&tc(sprintf("class add dev %s parent 1: classid 1:1 htb rate %skbit", $iface, $ifspeed));
-	&tc(sprintf("class add dev %s parent 1:1 classid 1:10 htb rate %skbit ceil %skbit prio 0", $iface, int($ifspeed/1.3), $ifspeed+10));
-	&tc(sprintf("class add dev %s parent 1:1 classid 1:20 htb rate %skbit ceil %skbit prio 1", $iface, int(($ifspeed+10)/8), $ifspeed));
-	&tc(sprintf("class add dev %s parent 1:1 classid 1:30 htb rate %skbit ceil %skbit prio 2", $iface, int($ifspeed/15), int($ifspeed-($ifspeed/3))));
-	&tc(sprintf("qdisc add dev %s parent 1:10 handle 10: sfq perturb 10", $iface));
-	&tc(sprintf("qdisc add dev %s parent 1:20 handle 20: sfq perturb 10", $iface));
-	&tc(sprintf("qdisc add dev %s parent 1:30 handle 30: sfq perturb 10", $iface));
 }
 
 ###############################################################################
@@ -221,7 +223,7 @@ sub bomb {
 
 sub setup_route_tables {
 	&comment('Setting up multiple routing tables');
-	my @routes = map { chomp; $_ } grep { !/^default/ } `/sbin/ip route list table main`;
+	my @routes = map { chomp; $_ } grep { !/^default/ } `$IP2 route list table main`;
 
 	# Routing Table for packets directed out Connection 1
 	&ip2('route flush table 1 2>/dev/null');
@@ -264,17 +266,17 @@ sub initialize_mangle {
 	# This marks any NEW incoming connections with the connection
 	# they came in via so replies go back the same way.
 	&comment('==> Handle incoming connection streams to route back via where they came in');
-	&ipt("-t mangle -A PREROUTING -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j M101");
-	&ipt("-t mangle -A PREROUTING -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j M102");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j M101");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j M102");
 }
 
 sub setup_mark_chains {
 	&comment('Setting up marking chains');
 	&ipt('-t mangle -N M101');
-	&ipt('-t mangle -A M101 -j MARK –set-mark 101');
+	&ipt("-t mangle -A M101 -m comment --comment 'mark as $config{gw1} traffic' -j MARK –set-mark 101");
 	&ipt('-t mangle -A M101 -j CONNMARK –save-mark');
 	&ipt('-t mangle -N M102');
-	&ipt('-t mangle -A M102 -j MARK –set-mark 102');
+	&ipt("-t mangle -A M102 -m comment --comment 'mark as $config{gw2} traffic' -j MARK –set-mark 102");
 	&ipt('-t mangle -A M102 -j CONNMARK –save-mark');
 }
 
@@ -284,8 +286,8 @@ sub setup_snat {
 		next unless (/^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
 		my $snat_source = $1;
 		&comment('==> Adding SNAT for '.$snat_source);
-		&ipt("-t nat -A POSTROUTING -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT –to-source $config{ip1}");
-		&ipt("-t nat -A POSTROUTING -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT –to-source $config{ip2}");
+		&ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if1}' -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT –to-source $config{ip1}");
+		&ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if2}' -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT –to-source $config{ip2}");
 	}
 }
 
