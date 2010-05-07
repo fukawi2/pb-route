@@ -64,8 +64,8 @@ my %config; # The hash where the config will be stored once read
 &comment('');
 &setup_route_tables;
 &ipt_flush;
-&initialize_mangle;
 &setup_mark_chains;	# sets up Mgw1 and Mgw2 chains
+&initialize_mangle;
 
 ###############################################################################
 ### Setup Policies
