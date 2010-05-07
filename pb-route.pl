@@ -65,7 +65,7 @@ my %config; # The hash where the config will be stored once read
 &setup_route_tables;
 &ipt_flush;
 &initialize_mangle;
-&setup_mark_chains;	# sets up M101 and M102 chains
+&setup_mark_chains;	# sets up Mgw1 and Mgw2 chains
 
 ###############################################################################
 ### Setup Policies
@@ -80,9 +80,9 @@ foreach (@dests) {
 	my($dest_address, $gw) = split(' ', $_);
 	next unless ($dest_address =~ /^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
 	$dest_address = $1;
-	&ipt("-t mangle -A PREROUTING -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j M$gw");
 	&ipt("-t mangle -A PREROUTING -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j M$gw");
 	&ipt("-t mangle -A OUTPUT -m comment --comment '$dest_address via connection $gw' -m state --state NEW -d $dest_address -j ACCEPT");
 }
 my @ports;
@@ -93,13 +93,13 @@ foreach (@ports) {
 	my($dest_port, $gw) = split(' ', $_);
 	next unless ($dest_port =~ /^([0-9]+)$/);
 	$dest_port = $1;
-	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j M$gw");
 	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j ACCEPT");
-	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j M$gw");
 	&ipt("-t mangle -A PREROUTING -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j M$gw");
 	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p tcp --dport $dest_port -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j M$gw");
 	&ipt("-t mangle -A OUTPUT -m comment --comment 'udp $dest_port via connection $gw' -m state --state NEW -p udp --dport $dest_port -j ACCEPT");
 }
 my @protos;
@@ -110,9 +110,9 @@ foreach (@protos) {
 	my($protocol, $gw) = split(' ', $_);
 	next unless ($protocol =~ /^(tcp|udp|icmp|gre)$/);
 	$protocol = $1;
-	&ipt("-t mangle -A PREROUTING -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j M10$gw");
+	&ipt("-t mangle -A PREROUTING -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j M$gw");
 	&ipt("-t mangle -A PREROUTING -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j ACCEPT");
-	&ipt("-t mangle -A OUTPUT -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j M10$gw");
+	&ipt("-t mangle -A OUTPUT -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j M$gw");
 	&ipt("-t mangle -A OUTPUT -m comment --comment '$protocol via connection $gw' -m state --state NEW -p $protocol -j ACCEPT");
 }
 
@@ -122,20 +122,20 @@ switch ($config{default}) {
 		# Default balance between connections
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j Mgw1");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j Mgw2");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j Mgw1");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j Mgw2");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j ACCEPT");
 	}
 	case /[0-9]/ {
 		# Default via a specific connection
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j M10$config{default}");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j M$config{default}");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j ACCEPT");
 	}
 }
@@ -264,27 +264,27 @@ sub initialize_mangle {
 	# they came in via so replies go back the same way.
 	&comment('==> Handle incoming connection streams to route back via where they came in');
 	if (defined($config{gw1mac})) {
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j Mgw1");
 	} else {
 		# No mac in conf file; differentiate on interface only
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j Mgw1");
 	}
 	if (defined($config{gw2mac})) {
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j Mgw2");
 	} else {
 		# No mac in conf file; differentiate on interface only
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j Mgw2");
 	}
 }
 
 sub setup_mark_chains {
 	&comment('Setting up marking chains');
-	&ipt('-t mangle -N M101');
-	&ipt("-t mangle -A M101 -m comment --comment 'mark as $config{gw1} traffic' -j MARK --set-mark 101");
-	&ipt('-t mangle -A M101 -j CONNMARK --save-mark');
-	&ipt('-t mangle -N M102');
-	&ipt("-t mangle -A M102 -m comment --comment 'mark as $config{gw2} traffic' -j MARK --set-mark 102");
-	&ipt('-t mangle -A M102 -j CONNMARK --save-mark');
+	&ipt('-t mangle -N Mgw1');
+	&ipt("-t mangle -A Mgw1 -m comment --comment 'mark as $config{gw1} traffic' -j MARK --set-mark 101");
+	&ipt('-t mangle -A Mgw1 -j CONNMARK --save-mark');
+	&ipt('-t mangle -N Mgw2');
+	&ipt("-t mangle -A Mgw2 -m comment --comment 'mark as $config{gw2} traffic' -j MARK --set-mark 102");
+	&ipt('-t mangle -A Mgw2 -j CONNMARK --save-mark');
 }
 
 sub setup_snat {
