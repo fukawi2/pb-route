@@ -120,21 +120,21 @@ foreach (@protos) {
 switch ($config{default}) {
 	case "balanced" {
 		# Default balance between connections
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j M101");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 0 -j ACCEPT");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j M102");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic –mode nth –every 2 –packet 1 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p tcp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j M101");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 0 -j ACCEPT");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j M102");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default balancing' -m mark --mark 0 -p udp -m state --state NEW -m statistic --mode nth --every 2 --packet 1 -j ACCEPT");
 	}
 	case /[0-9]/ {
 		# Default via a specific connection
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK –restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p tcp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -p udp -m state --state ESTABLISHED,RELATED -j CONNMARK --restore-mark");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j M10$config{default}");
 		&ipt("-t mangle -A PREROUTING -m comment --comment 'default via connection $config{default}' -m mark --mark 0 -p tcp -m state --state NEW -j ACCEPT");
 	}
@@ -280,11 +280,11 @@ sub initialize_mangle {
 sub setup_mark_chains {
 	&comment('Setting up marking chains');
 	&ipt('-t mangle -N M101');
-	&ipt("-t mangle -A M101 -m comment --comment 'mark as $config{gw1} traffic' -j MARK –set-mark 101");
-	&ipt('-t mangle -A M101 -j CONNMARK –save-mark');
+	&ipt("-t mangle -A M101 -m comment --comment 'mark as $config{gw1} traffic' -j MARK --set-mark 101");
+	&ipt('-t mangle -A M101 -j CONNMARK --save-mark');
 	&ipt('-t mangle -N M102');
-	&ipt("-t mangle -A M102 -m comment --comment 'mark as $config{gw2} traffic' -j MARK –set-mark 102");
-	&ipt('-t mangle -A M102 -j CONNMARK –save-mark');
+	&ipt("-t mangle -A M102 -m comment --comment 'mark as $config{gw2} traffic' -j MARK --set-mark 102");
+	&ipt('-t mangle -A M102 -j CONNMARK --save-mark');
 }
 
 sub setup_snat {
@@ -293,8 +293,8 @@ sub setup_snat {
 		next unless (/^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
 		my $snat_source = $1;
 		&comment('==> Adding SNAT for '.$snat_source);
-		&ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if1}' -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT –to-source $config{ip1}");
-		&ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if2}' -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT –to-source $config{ip2}");
+		&ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if1}' -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT --to-source $config{ip1}");
+		&ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if2}' -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT --to-source $config{ip2}");
 	}
 }
 
