@@ -50,6 +50,7 @@ my %config; # The hash where the config will be stored once read
 	$IPT = defined($config{iptables}) ? $config{iptables} : '/sbin/iptables';
 	$IP2 = defined($config{ip}) ? $config{ip} : '/sbin/ip';
 	$TC  = defined($config{tc}) ? $config{tc} : '/sbin/tc';
+	$PRINT_ONLY = defined($config{print_only}) ? $config{print_only} : 1;
 }
 
 ###############################################################################
