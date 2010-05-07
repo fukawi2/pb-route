@@ -64,6 +64,7 @@ my %config; # The hash where the config will be stored once read
 &setup_route_tables;
 &ipt_flush;
 &initialize_mangle;
+&setup_mark_chains;	# sets up M101 and M102 chains
 
 ###############################################################################
 ### Setup Policies
