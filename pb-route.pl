@@ -267,8 +267,18 @@ sub initialize_mangle {
 	# This marks any NEW incoming connections with the connection
 	# they came in via so replies go back the same way.
 	&comment('==> Handle incoming connection streams to route back via where they came in');
-	&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j M101");
-	&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j M102");
+	if (defined($config{gw1mac})) {
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j M101");
+	} else {
+		# No mac in conf file; differentiate on interface only
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j M101");
+	}
+	if (defined($config{gw2mac})) {
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j M102");
+	} else {
+		# No mac in conf file; differentiate on interface only
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j M102");
+	}
 }
 
 sub setup_mark_chains {
