@@ -150,6 +150,9 @@ for(my $X = 0; $X < $cnt; $X++) {
 	my $iface   = $ifaces[$X];
 	my $ifspeed = $ifspeeds[$X];
 
+	my @ipt_protos = ('tcp', 'udp');
+	my @ipt_ports  = ('dports', 'sports');
+
 	&comment("---> Special Policies for interface $iface");
 	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --syn -m length --length 40:68 -j CLASSIFY --set-class 1:10");
 	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp --tcp-flags ALL SYN,ACK -m length --length 40:68 -j CLASSIFY --set-class 1:10");
@@ -160,30 +163,39 @@ for(my $X = 0; $X < $cnt; $X++) {
 	&ipt("-t mangle -A POSTROUTING -m comment --comment 'icmp high priority' -o $iface -p icmp -m length --length 40:256 -j CLASSIFY --set-class 1:10");
 	# High Priority Ports
 	&comment("---> High Priority Ports for interface $iface");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp -m multiport --sports 22,53,80 -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p tcp -m multiport --dports 22,53,80 -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p udp -m multiport --sports 22,53,80 -j CLASSIFY --set-class 1:10");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p udp -m multiport --dports 22,53,80 -j CLASSIFY --set-class 1:10");
+	foreach (@ipt_protos) {
+		my $proto = $_;
+		foreach (@ipt_ports) {
+			my $port_rule = $_;
+			&ipt("-t mangle -A POSTROUTING -m comment --comment 'high priority' -o $iface -p $proto -m multiport --$port_rule 22,53,80 -j CLASSIFY --set-class 1:10");
+		}
+	}
 	# Low Priority Ports
 	&comment("---> Low Priority Ports for interface $iface");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p tcp -m multiport --sports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p tcp -m multiport --dports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p udp -m multiport --sports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p udp -m multiport --dports 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+	foreach (@ipt_protos) {
+		my $proto = $_;
+		foreach (@ipt_ports) {
+			my $port_rule = $_;
+			&ipt("-t mangle -A POSTROUTING -m comment --comment 'low priority' -o $iface -p $proto -m multiport --$port_rule 873,110,20,21,143 -j CLASSIFY --set-class 1:20");
+		}
+	}
 	# Extra Low Priority Ports
 	&comment("---> Extra Low Priority Ports for interface $iface");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p tcp -m multiport --sports 25,18925,49162 -j CLASSIFY --set-class 1:30");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p tcp -m multiport --dports 25,18925,49162 -j CLASSIFY --set-class 1:30");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p udp -m multiport --sports 25,18925,49162 -j CLASSIFY --set-class 1:30");
-	&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p udp -m multiport --dports 25,18925,49162 -j CLASSIFY --set-class 1:30");
+	foreach (@ipt_protos) {
+		my $proto = $_;
+		foreach (@ipt_ports) {
+			my $port_rule = $_;
+			&ipt("-t mangle -A POSTROUTING -m comment --comment 'extra low priority' -o $iface -p $proto -m multiport --$port_rule 25,18925,49162 -j CLASSIFY --set-class 1:30");
+		}
+	}
 	# Install TC shaping policies
 	&comment("---> tc rules for interface $iface ($ifspeed kbps)");
 	&tc(sprintf("qdisc del dev %s root;", $iface));
 	&tc(sprintf("qdisc add dev %s root handle 1: htb default 20;", $iface));
 	&tc(sprintf("class add dev %s parent 1: classid 1:1 htb rate %skbit", $iface, $ifspeed));
-	&tc(sprintf("class add dev %s parent 1:1 classid 1:10 htb rate %skbit ceil %skbit prio 0", $iface, $ifspeed-30, $ifspeed+10));
-	&tc(sprintf("class add dev %s parent 1:1 classid 1:20 htb rate %skbit ceil %skbit prio 1", $iface, ($ifspeed+10)/8, $ifspeed));
-	&tc(sprintf("class add dev %s parent 1:1 classid 1:30 htb rate %skbit ceil %skbit prio 2", $iface, $ifspeed/15, $ifspeed-($ifspeed/3)));
+	&tc(sprintf("class add dev %s parent 1:1 classid 1:10 htb rate %skbit ceil %skbit prio 0", $iface, int($ifspeed/1.3), $ifspeed+10));
+	&tc(sprintf("class add dev %s parent 1:1 classid 1:20 htb rate %skbit ceil %skbit prio 1", $iface, int(($ifspeed+10)/8), $ifspeed));
+	&tc(sprintf("class add dev %s parent 1:1 classid 1:30 htb rate %skbit ceil %skbit prio 2", $iface, int($ifspeed/15), int($ifspeed-($ifspeed/3))));
 	&tc(sprintf("qdisc add dev %s parent 1:10 handle 10: sfq perturb 10", $iface));
 	&tc(sprintf("qdisc add dev %s parent 1:20 handle 20: sfq perturb 10", $iface));
 	&tc(sprintf("qdisc add dev %s parent 1:30 handle 30: sfq perturb 10", $iface));
