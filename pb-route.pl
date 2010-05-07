@@ -247,13 +247,7 @@ sub setup_route_tables {
 
 sub ipt_flush {
 	# Flush all iptables rules
-	&comment('Flushing all tables');
-	&ipt('-F');
-	&ipt('-X');
-	&ipt('-t nat -F');
-	&ipt('-t nat -X');
-	&ipt('-t filter -F');
-	&ipt('-t filter -X');
+	&comment('Flushing all chains in the "mangle" table');
 	&ipt('-t mangle -F');
 	&ipt('-t mangle -X');
 	return undef;
