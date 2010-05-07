@@ -24,6 +24,7 @@ use Switch;
 # Configuration
 # TODO: Accept command line argument
 my $conf_file = './pb-route.conf';
+# TODO: Actually use this variable :P
 my $verbose = 1;
 
 # Runtime variables
