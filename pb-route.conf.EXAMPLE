@@ -4,7 +4,9 @@
 ip1 = a.b.c.d
 if1 = eth0
 gw1ip = x.x.x.x
-gw1mac = aa:aa:aa:aa:aa
+# Optional
+;gw1mac = aa:aa:aa:aa:aa
+;ip1speed = 1500	# In kilobytes, not kilobits
 
 #
 # IP Address and Name of Interface 2, plus
@@ -12,7 +14,9 @@ gw1mac = aa:aa:aa:aa:aa
 ip2 = w.x.y.z
 if2 = eth2
 gw2ip = y.y.y.y
-gw2mac = bb:bb:bb:bb:bb
+# Optional
+;gw2mac = bb:bb:bb:bb:bb
+;ip2speed = 1500	# In kilobytes, not kilobits
 
 #
 # SNAT
