@@ -281,16 +281,16 @@ sub initialize_mangle {
 	# they came in via so replies go back the same way.
 	&comment('==> Handle incoming connection streams to route back via where they came in');
 	if (defined($config{gw1mac})) {
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j Mgw1");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j MARK-gw1");
 	} else {
 		# No mac in conf file; differentiate on interface only
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j Mgw1");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j MARK-gw1");
 	}
 	if (defined($config{gw2mac})) {
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j Mgw2");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j MARK-gw2");
 	} else {
 		# No mac in conf file; differentiate on interface only
-		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j Mgw2");
+		&ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j MARK-gw2");
 	}
 }
 
