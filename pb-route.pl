@@ -21,6 +21,14 @@ use warnings;
 use Config::General;
 use Switch;
 
+# Global Variables
+my $conf_file;
+my $PRINT_ONLY;
+my $IPT;  # Path to 'iptables' binary
+my $IP2;  # Path to iproute2 'ip' binary
+my $TC;   # Path to 'tc' binary
+my $FLUSH;# Does the netfilter table need flushing?
+
 ###############################################################################
 ### SUBROUTINES
 ###############################################################################
@@ -31,7 +39,33 @@ sub bomb {
   exit 1;
 }
 
+sub ip2 {
+  # Do an iproute2 command
+  $PRINT_ONLY == 1 ? printf("%s %s\n", $IP2, @_) : system(sprintf('%s %s', $IP2, @_));
+}
+sub ipt {
+  # Do an iptables command
+  $PRINT_ONLY == 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
+}
+sub tc {
+  # Do a 'tc' command
+  $PRINT_ONLY == 1 ? printf("%s %s\n", $TC, @_) : system(sprintf('%s %s', $TC, @_));
+}
+sub comment {
+  # Make a comment in print mode
+  printf("# %s\n", @_) if $PRINT_ONLY == 1;
+}
+
+sub trim($) {
+  my $string = shift;
+  $string =~ s/\s{2,}/ /; # Multiple Spaces
+  $string =~ s/^\s//; # Leading Spaces
+  $string =~ s/\s$//; # Trailing Spaces
+  return $string;
+}
+
 sub setup_route_tables {
+  my %config = %{$_[0]};  # a hashref was passed
   comment('Setting up multiple routing tables');
   my @routes = map { chomp; $_ } grep { !/^default/ } `$IP2 route list table main`;
 
@@ -63,6 +97,7 @@ sub ipt_flush {
 }
 
 sub initialize_mangle {
+  my %config = %{$_[0]};  # a hashref was passed
   comment('Initializing "mangle" table');
   comment('==> Handle connection streams that have already been marked');
   ipt('-t mangle -A PREROUTING -j CONNMARK --restore-mark');
@@ -85,6 +120,7 @@ sub initialize_mangle {
 }
 
 sub setup_mark_chains {
+  my %config = %{$_[0]};  # a hashref was passed
   comment('Setting up marking chains');
   ipt('-t mangle -N MARK-gw1');
   ipt("-t mangle -A MARK-gw1 -m comment --comment 'send via $config{gw1ip}' -j MARK --set-mark 101");
@@ -97,6 +133,7 @@ sub setup_mark_chains {
 }
 
 sub setup_snat {
+  my %config = %{$_[0]};  # a hashref was passed
   comment('Setting up Source NATs');
   if ($config{snat}) {
     foreach (split(' ', $config{snat})) {
@@ -109,58 +146,20 @@ sub setup_snat {
   }
 }
 
-sub ip2 {
-  # Do an iproute2 command
-  $PRINT_ONLY == 1 ? printf("%s %s\n", $IP2, @_) : system(sprintf('%s %s', $IP2, @_));
-}
-sub ipt {
-  # Do an iptables command
-  $PRINT_ONLY == 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
-}
-sub tc {
-  # Do a 'tc' command
-  $PRINT_ONLY == 1 ? printf("%s %s\n", $TC, @_) : system(sprintf('%s %s', $TC, @_));
-}
-sub comment {
-  # Make a comment in print mode
-  printf("# %s\n", @_) if $PRINT_ONLY == 1;
-}
-
-sub trim($) {
-  my $string = shift;
-  $string =~ s/\s{2,}/ /; # Multiple Spaces
-  $string =~ s/^\s//; # Leading Spaces
-  $string =~ s/\s$//; # Trailing Spaces
-  return $string;
-}
-
 
 #######################################################
 # START OF MAIN CODE
 #######################################################
 
-# Configuration
-my $conf_file;
-# TODO: Actually use this variable :P
-my $verbose;
-my $PRINT_ONLY;
 # Get command line args, if any
 if (@ARGV > 0) {
   GetOptions (
     'config=s'  => \$conf_file,
-    'print-only'  => \$PRINT_ONLY,
-    'verbose' => \$verbose
+    'print-only'  => \$PRINT_ONLY
   )
 }
 $conf_file  = './pb-route.conf' unless defined($conf_file);
 $PRINT_ONLY = 1                 unless defined($PRINT_ONLY);
-$verbose    = 1                 unless defined($verbose);
-
-# Runtime variables
-my $IPT;  # Path to 'iptables' binary
-my $IP2;  # Path to iproute2 'ip' binary
-my $TC;   # Path to 'tc' binary
-my $FLUSH;# Does the netfilter table need flushing?
 
 # Read the config file (or die)
 my %config; # The hash where the config will be stored once read
@@ -192,10 +191,10 @@ comment('This program comes with ABSOLUTELY NO WARRANTY; This is free software, 
 comment('welcome to use and redistribute it under the conditions of the GPL license version 2');
 comment('See the "COPYING" file for further details.');
 comment('');
-setup_route_tables;
+setup_route_tables(\%config); # pass a hashref
 ipt_flush if $FLUSH;
-setup_mark_chains;  # sets up MARK-gw1 and MARK-gw2 chains
-initialize_mangle;
+setup_mark_chains(\%config); # pass a hashref - sets up MARK-gw1 and MARK-gw2 chains
+initialize_mangle(\%config); # pass a hashref
 
 ###############################################################################
 ### Setup Policies
@@ -346,7 +345,7 @@ if (defined($config{if1speed}) and defined($config{if2speed})) {
 ###############################################################################
 ### Cleanup
 ###############################################################################
-setup_snat;
+setup_snat(\%config); # pass a hashref
 # Flush the route cache to make it picks up our new routing policies
 comment('Flushing route cache so new routes take effect');
 ip2('route flush cache');
