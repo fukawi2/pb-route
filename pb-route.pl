@@ -21,6 +21,124 @@ use warnings;
 use Config::General;
 use Switch;
 
+###############################################################################
+### SUBROUTINES
+###############################################################################
+
+sub bomb {
+  # Bomb out for some reason
+  printf ("BOMBS AWAY: %s\n", @_);
+  exit 1;
+}
+
+sub setup_route_tables {
+  comment('Setting up multiple routing tables');
+  my @routes = map { chomp; $_ } grep { !/^default/ } `$IP2 route list table main`;
+
+  # Routing Table for packets directed out Connection 1
+  ip2('route flush table 1 2>/dev/null');
+  ip2('rule del fwmark 101 table 1 2>/dev/null');
+  foreach (@routes) {
+          ip2('route add table 1 '.trim($_).' 2>/dev/null');
+  }
+  ip2("route add table 1 default via $config{gw1ip} dev $config{if1}");
+  ip2('rule add fwmark 101 table 1');
+
+  # Routing Table for packets directed out Connection 2
+  ip2('route flush table 2 2>/dev/null');
+  ip2('rule del fwmark 102 table 2 2>/dev/null');
+  foreach (@routes) {
+          ip2('route add table 2 '.trim($_).' 2>/dev/null');
+  }
+  ip2("route add table 2 default via $config{gw2ip} dev $config{if2}");
+  ip2('rule add fwmark 102 table 2');
+}
+
+sub ipt_flush {
+  # Flush all iptables rules
+  comment('Flushing all chains in the "mangle" table');
+  ipt('-t mangle -F');
+  ipt('-t mangle -X');
+  return undef;
+}
+
+sub initialize_mangle {
+  comment('Initializing "mangle" table');
+  comment('==> Handle connection streams that have already been marked');
+  ipt('-t mangle -A PREROUTING -j CONNMARK --restore-mark');
+  ipt('-t mangle -A PREROUTING -m comment --comment "this stream is already marked; escape early" -m mark ! --mark 0 -j ACCEPT');
+  # This marks any NEW incoming connections with the connection
+  # they came in via so replies go back the same way.
+  comment('==> Handle incoming connection streams to route back via where they came in');
+  if (defined($config{gw1mac})) {
+    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j MARK-gw1");
+  } else {
+    # No mac in conf file; differentiate on interface only
+    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j MARK-gw1");
+  }
+  if (defined($config{gw2mac})) {
+    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j MARK-gw2");
+  } else {
+    # No mac in conf file; differentiate on interface only
+    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j MARK-gw2");
+  }
+}
+
+sub setup_mark_chains {
+  comment('Setting up marking chains');
+  ipt('-t mangle -N MARK-gw1');
+  ipt("-t mangle -A MARK-gw1 -m comment --comment 'send via $config{gw1ip}' -j MARK --set-mark 101");
+  ipt('-t mangle -A MARK-gw1 -j CONNMARK --save-mark');
+  ipt('-t mangle -A MARK-gw1 -j RETURN');
+  ipt('-t mangle -N MARK-gw2');
+  ipt("-t mangle -A MARK-gw2 -m comment --comment 'send via $config{gw2ip}' -j MARK --set-mark 102");
+  ipt('-t mangle -A MARK-gw2 -j CONNMARK --save-mark');
+  ipt('-t mangle -A MARK-gw2 -j RETURN');
+}
+
+sub setup_snat {
+  comment('Setting up Source NATs');
+  if ($config{snat}) {
+    foreach (split(' ', $config{snat})) {
+      next unless (/^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
+      my $snat_source = $1;
+      comment('==> Adding SNAT for '.$snat_source);
+      ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if1}' -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT --to-source $config{ip1}");
+      ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if2}' -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT --to-source $config{ip2}");
+    }
+  }
+}
+
+sub ip2 {
+  # Do an iproute2 command
+  $PRINT_ONLY == 1 ? printf("%s %s\n", $IP2, @_) : system(sprintf('%s %s', $IP2, @_));
+}
+sub ipt {
+  # Do an iptables command
+  $PRINT_ONLY == 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
+}
+sub tc {
+  # Do a 'tc' command
+  $PRINT_ONLY == 1 ? printf("%s %s\n", $TC, @_) : system(sprintf('%s %s', $TC, @_));
+}
+sub comment {
+  # Make a comment in print mode
+  printf("# %s\n", @_) if $PRINT_ONLY == 1;
+}
+
+sub trim($) {
+  my $string = shift;
+  $string =~ s/\s{2,}/ /; # Multiple Spaces
+  $string =~ s/^\s//; # Leading Spaces
+  $string =~ s/\s$//; # Trailing Spaces
+  return $string;
+}
+
+
+#######################################################
+# START OF MAIN CODE
+#######################################################
+
 # Configuration
 my $conf_file;
 # TODO: Actually use this variable :P
@@ -232,116 +350,3 @@ setup_snat;
 # Flush the route cache to make it picks up our new routing policies
 comment('Flushing route cache so new routes take effect');
 ip2('route flush cache');
-
-###############################################################################
-### SUBROUTINES
-###############################################################################
-
-sub bomb {
-  # Bomb out for some reason
-  printf ("BOMBS AWAY: %s\n", @_);
-  exit 1;
-}
-
-sub setup_route_tables {
-  comment('Setting up multiple routing tables');
-  my @routes = map { chomp; $_ } grep { !/^default/ } `$IP2 route list table main`;
-
-  # Routing Table for packets directed out Connection 1
-  ip2('route flush table 1 2>/dev/null');
-  ip2('rule del fwmark 101 table 1 2>/dev/null');
-  foreach (@routes) {
-          ip2('route add table 1 '.trim($_).' 2>/dev/null');
-  }
-  ip2("route add table 1 default via $config{gw1ip} dev $config{if1}");
-  ip2('rule add fwmark 101 table 1');
-
-  # Routing Table for packets directed out Connection 2
-  ip2('route flush table 2 2>/dev/null');
-  ip2('rule del fwmark 102 table 2 2>/dev/null');
-  foreach (@routes) {
-          ip2('route add table 2 '.trim($_).' 2>/dev/null');
-  }
-  ip2("route add table 2 default via $config{gw2ip} dev $config{if2}");
-  ip2('rule add fwmark 102 table 2');
-}
-
-sub ipt_flush {
-  # Flush all iptables rules
-  comment('Flushing all chains in the "mangle" table');
-  ipt('-t mangle -F');
-  ipt('-t mangle -X');
-  return undef;
-}
-
-sub initialize_mangle {
-  comment('Initializing "mangle" table');
-  comment('==> Handle connection streams that have already been marked');
-  ipt('-t mangle -A PREROUTING -j CONNMARK --restore-mark');
-  ipt('-t mangle -A PREROUTING -m comment --comment "this stream is already marked; escape early" -m mark ! --mark 0 -j ACCEPT');
-  # This marks any NEW incoming connections with the connection
-  # they came in via so replies go back the same way.
-  comment('==> Handle incoming connection streams to route back via where they came in');
-  if (defined($config{gw1mac})) {
-    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m mac --mac-source $config{gw1mac} -m state --state NEW -j MARK-gw1");
-  } else {
-    # No mac in conf file; differentiate on interface only
-    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if1} -m state --state NEW -j MARK-gw1");
-  }
-  if (defined($config{gw2mac})) {
-    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m mac --mac-source $config{gw2mac} -m state --state NEW -j MARK-gw2");
-  } else {
-    # No mac in conf file; differentiate on interface only
-    ipt("-t mangle -A PREROUTING -m comment --comment 'prevent asynchronous routing' -i $config{if2} -m state --state NEW -j MARK-gw2");
-  }
-}
-
-sub setup_mark_chains {
-  comment('Setting up marking chains');
-  ipt('-t mangle -N MARK-gw1');
-  ipt("-t mangle -A MARK-gw1 -m comment --comment 'send via $config{gw1ip}' -j MARK --set-mark 101");
-  ipt('-t mangle -A MARK-gw1 -j CONNMARK --save-mark');
-  ipt('-t mangle -A MARK-gw1 -j RETURN');
-  ipt('-t mangle -N MARK-gw2');
-  ipt("-t mangle -A MARK-gw2 -m comment --comment 'send via $config{gw2ip}' -j MARK --set-mark 102");
-  ipt('-t mangle -A MARK-gw2 -j CONNMARK --save-mark');
-  ipt('-t mangle -A MARK-gw2 -j RETURN');
-}
-
-sub setup_snat {
-  comment('Setting up Source NATs');
-  if ($config{snat}) {
-    foreach (split(' ', $config{snat})) {
-      next unless (/^((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/[0-9]{1,2})$/);
-      my $snat_source = $1;
-      comment('==> Adding SNAT for '.$snat_source);
-      ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if1}' -o $config{if1} -s $snat_source -m mark --mark 101 -j SNAT --to-source $config{ip1}");
-      ipt("-t nat -A POSTROUTING -m comment --comment 'snat outbound $config{if2}' -o $config{if2} -s $snat_source -m mark --mark 102 -j SNAT --to-source $config{ip2}");
-    }
-  }
-}
-
-sub ip2 {
-  # Do an iproute2 command
-  $PRINT_ONLY == 1 ? printf("%s %s\n", $IP2, @_) : system(sprintf('%s %s', $IP2, @_));
-}
-sub ipt {
-  # Do an iptables command
-  $PRINT_ONLY == 1 ? printf("%s %s\n", $IPT, @_) : system(sprintf('%s %s', $IPT, @_));
-}
-sub tc {
-  # Do a 'tc' command
-  $PRINT_ONLY == 1 ? printf("%s %s\n", $TC, @_) : system(sprintf('%s %s', $TC, @_));
-}
-sub comment {
-  # Make a comment in print mode
-  printf("# %s\n", @_) if $PRINT_ONLY == 1;
-}
-
-sub trim($) {
-  my $string = shift;
-  $string =~ s/\s{2,}/ /; # Multiple Spaces
-  $string =~ s/^\s//; # Leading Spaces
-  $string =~ s/\s$//; # Trailing Spaces
-  return $string;
-}
