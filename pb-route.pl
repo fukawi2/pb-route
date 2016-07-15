@@ -42,6 +42,7 @@ $verbose    = 1                 unless defined($verbose);
 my $IPT;  # Path to 'iptables' binary
 my $IP2;  # Path to iproute2 'ip' binary
 my $TC;   # Path to 'tc' binary
+my $FLUSH;# Does the netfilter table need flushing?
 
 # Read the config file (or die)
 my %config; # The hash where the config will be stored once read
@@ -57,10 +58,11 @@ my %config; # The hash where the config will be stored once read
   $conf = new Config::General(%confHash); # Create the config reading object
   %config = $conf->getall;                # Read the config into the hash
 
-  $IPT = defined($config{iptables}) ? $config{iptables} : '/sbin/iptables';
-  $IP2 = defined($config{ip}) ? $config{ip} : '/sbin/ip';
-  $TC  = defined($config{tc}) ? $config{tc} : '/sbin/tc';
+  $IPT        = defined($config{iptables}) ? $config{iptables} : '/sbin/iptables';
+  $IP2        = defined($config{ip}) ? $config{ip} : '/sbin/ip';
+  $TC         = defined($config{tc}) ? $config{tc} : '/sbin/tc';
   $PRINT_ONLY = defined($config{print_only}) ? $config{print_only} : 1;
+  $FLUSH      = defined($config{flush_netfilter}) ? $config{flush_netfilter} : 1;
 }
 
 ###############################################################################
@@ -73,7 +75,7 @@ comment('welcome to use and redistribute it under the conditions of the GPL lice
 comment('See the "COPYING" file for further details.');
 comment('');
 setup_route_tables;
-ipt_flush;
+ipt_flush if $FLUSH;
 setup_mark_chains;  # sets up MARK-gw1 and MARK-gw2 chains
 initialize_mangle;
 

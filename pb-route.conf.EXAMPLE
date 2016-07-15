@@ -2,6 +2,12 @@
 # it generates. DO NOT DO THIS WITHOUT TESTING THE OUTPUT FIRST!!
 print_only = 1
 
+# Set to 0 to prevent the netfilter table being flushed before new
+# rules are processed. Use this to preserve existing rules, however
+# may cause duplicate rules upon subsequent onvocations if the table
+# is not flushed using another method
+flush_netfilter = 1
+
 #
 # IP Address and Name of Interface 1, plus
 # IP Address and MAC Address of Gateway 1
